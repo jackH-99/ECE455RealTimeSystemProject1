@@ -15,7 +15,6 @@ void shiftBit(uint8_t bit);
 void clearShiftRegister(void);
 
 void enableClocks(void);
-void LED_GPIO_Initialization(void);
 void ADC_GPIO_Initialization(void);
 void ShiftReg_GPIO_Init(void);
 void ADC_Initialization(void);

@@ -145,7 +145,7 @@ functionality.
 #include "../FreeRTOS_Source/include/semphr.h"
 #include "../FreeRTOS_Source/include/task.h"
 #include "../FreeRTOS_Source/include/timers.h"
-#include "middleware.h"
+#include "../src/middleware.h"
 
 #include <stdbool.h>
 
@@ -208,16 +208,16 @@ static void Red_LED_Controller_Task( void *pvParameters );
 static void Amber_LED_Controller_Task( void *pvParameters );
 */
 static void xTraffic_Controller_Task(void *pvParameters);
-static void xTraffic_Load_Task(void);
+static void xTraffic_Load_Task(void *pvParameters);
 static void vSpawn_Callback(TimerHandle_t xSpawnTimer);
-static void vTraffic_Light_Callback(TimerHandle_t xLightTimer, TrafficState state);
-void renderTrafficLight(uint8_t leds[], TrafficState state);
+static void vTraffic_Light_Callback(TimerHandle_t xLightTimer);
 TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel);
-TrafficState AdvanceTrafficLightState(TrafficState *state);
+void AdvanceTrafficLight(TrafficState *state);
 void RenderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8]);
 void UpdateRoadAndIntersection(uint8_t inter[3], uint8_t left[8], uint8_t right[8], bool spawnCar, TrafficState state);
 void ShiftLEDArray(uint8_t leds[], int count);
 void RenderIntersection(uint8_t leds[], uint8_t intersection[3]);
+void RenderTrafficLight(uint8_t leds[], TrafficState state);
 
 
 
@@ -279,7 +279,7 @@ int main(void)
 /*-------------------------------------------------------*/
 
 
-static void xTraffic_Load_Task(void)
+static void xTraffic_Load_Task(void *pvParameters)
 {
 	while(1)
 	{
@@ -339,7 +339,7 @@ static void xTraffic_Controller_Task(void *pvParameters)
 
 	while(1)
 	{
-		xQueueReceive(xTrafficLoadQueue, trafficLevel, 1000); //MAX DELAY 1000
+		xQueueReceive(xTrafficLoadQueue, &trafficLevel, 1000); //MAX DELAY 1000
  // May need to dereference
 
 
@@ -356,7 +356,7 @@ static void xTraffic_Controller_Task(void *pvParameters)
 			if (events && EVENT_LIGHT_CHANGE)
 			{
 
-				AdvanceTrafficLight(TrafficState *state);
+				AdvanceTrafficLight(&state);
 				TickType_t nextPeriod = GetLightDuration(state, trafficLevel);
 				xTimerChangePeriod(xLightTimer, nextPeriod, 0);
 			}
@@ -392,7 +392,7 @@ static void vSpawn_Callback(TimerHandle_t xSpawnTimer)
 
 /*-----------------------------------------------------------*/
 
-static void vTraffic_Light_Callback(TimerHandle_t xLightTimer, TrafficState state)
+static void vTraffic_Light_Callback(TimerHandle_t xLightTimer)
 {
 	xTaskNotify(xTraffic_Controller_Task, EVENT_LIGHT_CHANGE, eSetBits);
 
@@ -404,28 +404,62 @@ static void vTraffic_Light_Callback(TimerHandle_t xLightTimer, TrafficState stat
 void RenderTrafficLight(uint8_t leds[], TrafficState state)
 {
 	leds[10] = (state == RED_STATE);
-	leds[20] = (state == AMBER_STATE);
-	leds[21] = (state == GREEN_STATE);
+	leds[9] = (state == AMBER_STATE);
+	leds[8] = (state == GREEN_STATE);
 }
 
 void RenderIntersection(uint8_t leds[], uint8_t intersection[3])
 {
-	leds[8] = intersection[0];
-	leds[9] = intersection[1];
-	leds[10] = intersection[2];
+	leds[12] = intersection[0];
+	leds[13] = intersection[1];
+	leds[14] = intersection[2];
 
 }
 
 void RenderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8])
 {
-	for (int i = 0; i < 8; i++)
+
+	leds[3] = right[0];
+	leds[2] = right[1];
+	leds[1] = right[2];
+	leds[0] = right[3]; //wrong this is  the 3rd shift register
+	leds[4] = right[6]; //led 7 problem
+	leds[5] = right[5];
+	leds[6] = right[4];
+
+	//led [7] is q0 on second shift register.
+	leds[11] = right[7];
+
+	//moved to next shift register;
+
+
+
+
+}
+
+/*-----------------------------------------------------------*/
+
+void ConvertLEDToBytes(uint8_t leds[])
+{
+	uint8_t sr1 = 0;
+	uint8_t sr2 = 0;
+	uint8_t sr3 = 0;
+
+	for (int i = 0; i < 22; i++)
 	{
-		leds[i] = left[i];
+		if (led[i]){
+			int reg = i/8;
+			int bit = i%8;
+
+			if (reg == 0) sr1 |= (1 << bit);
+			if (reg == 1) sr2 |= (1 << bit);
+			if (reg == 2) sr3 |= (1 << bit);
+		}
 	}
-	for (int i = 0; i < 8; i++)
-	{
-		leds[11 + i] = right[i];
-	}
+
+	shiftByte(sr1);
+	shiftByte(sr2);
+	shiftByte(sr3);
 }
 
 /*-----------------------------------------------------------*/
@@ -552,23 +586,20 @@ TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel)
 
 /*-----------------------------------------------------------*/
 
-TrafficState AdvanceTrafficLight(TrafficState *state)
+void AdvanceTrafficLight(TrafficState *state)
 {
 	switch (*state)
 	{
 	case RED_STATE:
 		*state = GREEN_STATE;
-		return GREEN_STATE;
 		break;
 
 	case GREEN_STATE:
 		*state = AMBER_STATE;
-		return AMBER_STATE;
 		break;
 
 	case AMBER_STATE:
 		*state = RED_STATE;
-		return RED_STATE;
 		break;
 
 	}
@@ -794,7 +825,6 @@ static void prvSetupHardware( void )
 	NVIC_SetPriorityGrouping( 0 );
 
 	enableClocks();
-	LED_GPIO_Initialization();
 	ADC_GPIO_Initialization();
 	ShiftReg_GPIO_Init();
 	ADC_Initialization();

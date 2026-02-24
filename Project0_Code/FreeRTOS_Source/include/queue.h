@@ -911,7 +911,8 @@ BaseType_t xQueuePeekFromISR( QueueHandle_t xQueue, void * const pvBuffer ) PRIV
  * \defgroup xQueueReceive xQueueReceive
  * \ingroup QueueManagement
  */
-#define xQueueReceive( xQueue, pvBuffer, xTicksToWait ) xQueueGenericReceive( ( xQueue ), ( pvBuffer ), ( xTicksToWait ), pdFALSE )
+#define xQueueReceive( xQueue, pvBuffer, xTicksToWait ) \
+	xQueueGenericReceive( ( xQueue ), ( pvBuffer ), ( xTicksToWait ), pdFALSE )
 
 
 /**
