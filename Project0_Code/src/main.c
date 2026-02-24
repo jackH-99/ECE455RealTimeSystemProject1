@@ -365,6 +365,11 @@ static void xTraffic_Controller_Task(void *pvParameters)
 
 			UpdateRoadAndIntersection(intersection, roadLeft, roadRight, spawnCar, state);
 
+			spawnCar = false;
+
+			//Make spawnCar false again after updating the roadAndIntersection
+
+
 			//Sets the state of the road to the LED display
 
 			RenderRoad(leds, roadLeft, roadRight);
@@ -406,13 +411,17 @@ void RenderTrafficLight(uint8_t leds[], TrafficState state)
 	leds[10] = (state == RED_STATE);
 	leds[9] = (state == AMBER_STATE);
 	leds[8] = (state == GREEN_STATE);
+
+	//correct led numbers
 }
 
 void RenderIntersection(uint8_t leds[], uint8_t intersection[3])
 {
-	leds[12] = intersection[0];
-	leds[13] = intersection[1];
-	leds[14] = intersection[2];
+	leds[11] = intersection[0];
+	leds[12] = intersection[1];
+	leds[13] = intersection[2];
+
+	//correct led numbers
 
 }
 
@@ -422,13 +431,32 @@ void RenderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8])
 	leds[3] = right[0];
 	leds[2] = right[1];
 	leds[1] = right[2];
-	leds[0] = right[3]; //wrong this is  the 3rd shift register
-	leds[4] = right[6]; //led 7 problem
+	leds[0] = right[3];
+
+	leds[4] = right[6];
 	leds[5] = right[5];
 	leds[6] = right[4];
 
+	//correct for right side of road
+
 	//led [7] is q0 on second shift register.
-	leds[11] = right[7];
+
+	leds[7] = 0;
+
+
+
+	//LED [7] is always 0 because it is the output of the chain.
+
+
+	leds[14] = left[3];
+	leds[15] = left[2];
+	leds[16] = left[1];
+	leds[17] = left[0];
+
+	leds[18] = left[5];
+	leds[19] = left[4];
+	leds[20] = left[6];
+	leds[21] = left[7];
 
 	//moved to next shift register;
 
@@ -445,21 +473,29 @@ void ConvertLEDToBytes(uint8_t leds[])
 	uint8_t sr2 = 0;
 	uint8_t sr3 = 0;
 
-	for (int i = 0; i < 22; i++)
+	for (int i = 0; i < 7; i++)
 	{
-		if (led[i]){
-			int reg = i/8;
-			int bit = i%8;
+		sr1 |= (leds[i] & 1) << i;
 
-			if (reg == 0) sr1 |= (1 << bit);
-			if (reg == 1) sr2 |= (1 << bit);
-			if (reg == 2) sr3 |= (1 << bit);
-		}
+	}
+	for (int i = 0; i < 8; i++)
+	{
+		sr2 |= (leds[7+i] & 1) << i;
+
+	}
+	for (int i = 0; i < 7; i++)
+	{
+
+		sr3 |= (leds[15+i] & 1) << i;
+
 	}
 
-	shiftByte(sr1);
-	shiftByte(sr2);
+
+
+	//MSB first
 	shiftByte(sr3);
+	shiftByte(sr2);
+	shiftByte(sr1);
 }
 
 /*-----------------------------------------------------------*/
@@ -605,20 +641,6 @@ void AdvanceTrafficLight(TrafficState *state)
 	}
 }
 
-void ShiftLEDArray(uint8_t leds[], int count)
-{
-	//Clear the chain
-	for (int i = 0; i < count; i++)
-	{
-		shiftBit(0);
-	}
-	//Shift in the LEDs
-	for (int i = 0; i < count; i++)
-	{
-		shiftBit(leds[i]);
-
-	}
-}
 
 /*------EndOfMyCode------------------------------------------*/
 

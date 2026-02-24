@@ -125,7 +125,7 @@ void shiftBit(uint8_t bit)
 		GPIO_ResetBits(GPIOC, GPIO_Pin_6);
 	}
 
-	GPIO_SetBits(GPIOC, SR_CLOCK_PIN);
+	GPIO_SetBits(GPIOC, SR_CLOCK_PIN);  //(Pulse Clock)
 	for (volatile int i = 0; i<50; i++); // DELAY
 	GPIO_ResetBits(GPIOC, SR_CLOCK_PIN); //Reset
 }
