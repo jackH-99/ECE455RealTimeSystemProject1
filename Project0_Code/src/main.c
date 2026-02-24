@@ -349,11 +349,11 @@ static void xTraffic_Controller_Task(void *pvParameters)
 
 			xTaskNotifyWait(0, UINT32_MAX, &events, 0);
 
-			if (events && EVENT_SPAWN_CAR)
+			if (events & EVENT_SPAWN_CAR)
 			{
 				spawnCar = true;
 			}
-			if (events && EVENT_LIGHT_CHANGE)
+			if (events & EVENT_LIGHT_CHANGE)
 			{
 
 				AdvanceTrafficLight(&state);
@@ -376,7 +376,7 @@ static void xTraffic_Controller_Task(void *pvParameters)
 			RenderIntersection(leds, intersection);
 			RenderTrafficLight(leds, state);
 
-			ShiftLEDArray(leds, 22);
+			ConvertLEDToBytes(leds);
 
 
 
