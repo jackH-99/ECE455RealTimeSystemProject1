@@ -12,7 +12,6 @@
 
 void shiftByte(uint8_t value);
 void shiftBit(uint8_t bit);
-void pulseClock(void);
 void clearShiftRegister(void);
 
 void enableClocks(void);

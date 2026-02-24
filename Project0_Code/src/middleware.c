@@ -1,4 +1,4 @@
-#include <stdint.h>
+ #include <stdint.h>
 #include <stdio.h>
 #include "stm32f4_discovery.h"
 #include "stm32f4xx_gpio.h"
@@ -14,8 +14,9 @@
 static void shiftByte(uint8_t value);
 static void shiftBit(uint8_t bit);
 
+
 static void enableClocks(){
-	RCC_AHB1PeriphClockCmd(RCC_AHB1_Periph_GPIOC, ENABLE); // set for the shift registers now
+	RCC_AHB1PeriphClockCmd(RCC_AHB1_Periph_GPIOB, ENABLE); // set for the shift registers now
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE); // don't know if this is right for the ADC
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
@@ -34,6 +35,7 @@ static void ADC_GPIO_Initialization(){
 
 
 }
+/*
 static void LED_GPIO_Initialization(){
 	GPIO_InitTypeDef red_Light;
 
@@ -63,33 +65,88 @@ static void LED_GPIO_Initialization(){
 	GPIO_Init(GPIOC, &amberLight_GPIO);
 	GPIO_Init(GPIOC, &greenLight_GPIO);
 }
+*/
 static void ShiftReg_GPIO_Init(void)
 {
-	GPIO_InitTypeDef GPIO_ShiftRegisterReset;
-	GPIO_InitTypeDef GPIO_ShiftRegisterClock;
-	GPIO_InitTypeDef GPIO_ShiftRegisterData;
+	GPIO_InitTypeDef GPIO_ShiftRegisterReset1;
+	GPIO_InitTypeDef GPIO_ShiftRegisterClock1;
+	GPIO_InitTypeDef GPIO_ShiftRegisterData1;
 
-	GPIO_ShiftRegisterReset.GPIO_Pin = GPIO_Pin_8;
-	GPIO_ShiftRegisterReset.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_ShiftRegisterReset.GPIO_OType = GPIO_OType_PP;
-	GPIO_ShiftRegisterReset.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_ShiftRegisterReset.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitTypeDef GPIO_ShiftRegisterReset2;
+	GPIO_InitTypeDef GPIO_ShiftRegisterClock2;
+	GPIO_InitTypeDef GPIO_ShiftRegisterData2;
 
-	GPIO_ShiftRegisterClock.GPIO_Pin = GPIO_Pin_7;
-	GPIO_ShiftRegisterClock.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_ShiftRegisterClock.GPIO_OType = GPIO_OType_PP;
-	GPIO_ShiftRegisterClock.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_ShiftRegisterClock.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitTypeDef GPIO_ShiftRegisterReset3;
+	GPIO_InitTypeDef GPIO_ShiftRegisterClock3;
+	GPIO_InitTypeDef GPIO_ShiftRegisterData3;
 
-	GPIO_ShiftRegisterData.GPIO_Pin = GPIO_Pin_6;
-	GPIO_ShiftRegisterData.GPIO_Mode = GPIO_Mode_OUT;
-	GPIO_ShiftRegisterData.GPIO_OType = GPIO_OType_PP;
-	GPIO_ShiftRegisterData.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_ShiftRegisterData.GPIO_PuPd = GPIO_PuPd_NOPULL;
 
-	GPIO_Init(GPIOC, &GPIO_ShiftRegisterReset);
-	GPIO_Init(GPIOC, &GPIO_ShiftRegisterClock);
-	GPIO_Init(GPIOC, &GPIO_ShiftRegisterData);
+
+	GPIO_ShiftRegisterReset1.GPIO_Pin = GPIO_Pin_8;
+	GPIO_ShiftRegisterReset1.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_ShiftRegisterReset1.GPIO_OType = GPIO_OType_PP;
+	GPIO_ShiftRegisterReset1.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterReset1.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+	GPIO_ShiftRegisterClock1.GPIO_Pin = GPIO_Pin_7;
+	GPIO_ShiftRegisterClock1.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_ShiftRegisterClock1.GPIO_OType = GPIO_OType_PP;
+	GPIO_ShiftRegisterClock1.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterClock1.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+	GPIO_ShiftRegisterData1.GPIO_Pin = GPIO_Pin_6;
+	GPIO_ShiftRegisterData1.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_ShiftRegisterData1.GPIO_OType = GPIO_OType_PP;
+	GPIO_ShiftRegisterData1.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterData1.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+	GPIO_ShiftRegisterReset2.GPIO_Pin = GPIO_Pin_11;
+	GPIO_ShiftRegisterReset2.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_ShiftRegisterReset2.GPIO_OType = GPIO_OType_PP;
+	GPIO_ShiftRegisterReset2.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterReset2.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+	GPIO_ShiftRegisterClock2.GPIO_Pin = GPIO_Pin_13;
+	GPIO_ShiftRegisterClock2.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_ShiftRegisterClock2.GPIO_OType = GPIO_OType_PP;
+	GPIO_ShiftRegisterClock2.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterClock2.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+	GPIO_ShiftRegisterData2.GPIO_Pin = GPIO_Pin_15;
+	GPIO_ShiftRegisterData2.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_ShiftRegisterData2.GPIO_OType = GPIO_OType_PP;
+	GPIO_ShiftRegisterData2.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterData2.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+	GPIO_ShiftRegisterReset3.GPIO_Pin = GPIO_Pin_12;
+	GPIO_ShiftRegisterReset3.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_ShiftRegisterReset3.GPIO_OType = GPIO_OType_PP;
+	GPIO_ShiftRegisterReset3.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterReset3.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+	GPIO_ShiftRegisterClock3.GPIO_Pin = GPIO_Pin_14;
+	GPIO_ShiftRegisterClock3.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_ShiftRegisterClock3.GPIO_OType = GPIO_OType_PP;
+	GPIO_ShiftRegisterClock3.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterClock3.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+	GPIO_ShiftRegisterData3.GPIO_Pin = GPIO_Pin_10;
+	GPIO_ShiftRegisterData3.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_ShiftRegisterData3.GPIO_OType = GPIO_OType_PP;
+	GPIO_ShiftRegisterData3.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterData3.GPIO_PuPd = GPIO_PuPd_NOPULL;
+
+	GPIO_Init(GPIOC, &GPIO_ShiftRegisterReset1);
+	GPIO_Init(GPIOC, &GPIO_ShiftRegisterClock1);
+	GPIO_Init(GPIOC, &GPIO_ShiftRegisterData1);
+
+	GPIO_Init(GPIOB, &GPIO_ShiftRegisterReset2);
+	GPIO_Init(GPIOB, &GPIO_ShiftRegisterClock2);
+	GPIO_Init(GPIOB, &GPIO_ShiftRegisterData2);
+
+	GPIO_Init(GPIOB, &GPIO_ShiftRegisterReset3);
+	GPIO_Init(GPIOB, &GPIO_ShiftRegisterClock3);
+	GPIO_Init(GPIOB, &GPIO_ShiftRegisterData3);
 }
 
 static void ADC__Initialization(){
@@ -102,27 +159,6 @@ static void ADC__Initialization(){
 	ADC_Cmd(ADC1, ENABLE);
 }
 
-
-static void Clear_Shift_Register()
-{
-	GPIO_ResetBits(GPIOC, GPIO_Pin_8);
-	for (volatile int i = 0; i < 50; i++);
-	GPIO_SetBits(GPIOC, GPIO_Pin_8);
-}
-static void Pulse_Clock(void)
-{
-	GPIO_SetBits(GPIOC, SR_CLOCK_PIN);
-	for (volatile int i = 0; i<50; i++);
-	GPIO_ResetBits(GPIOC, SR_CLOCK_PIN);
-
-}
-static void shiftByte(uint8_t value)
-{
-	for (int i = 7; i >= 0; i--)
-	{
-		shiftBit((value >> i) & 1);
-	}
-}
 static void shiftBit(uint8_t bit)
 {
 	if (bit)
@@ -134,7 +170,9 @@ static void shiftBit(uint8_t bit)
 		GPIO_ResetBits(GPIOC, GPIO_Pin_6);
 	}
 
-	Pusle_Clock();
+	GPIO_SetBits(GPIOC, SR_CLOCK_PIN);
+	for (volatile int i = 0; i<50; i++);
+	GPIO_ResetBits(GPIOC, SR_CLOCK_PIN);
 }
 
 

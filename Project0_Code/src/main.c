@@ -145,7 +145,9 @@ functionality.
 #include "../FreeRTOS_Source/include/semphr.h"
 #include "../FreeRTOS_Source/include/task.h"
 #include "../FreeRTOS_Source/include/timers.h"
-#include "middleware.h";
+#include "middleware.h"
+
+#include <stdbool.h>
 
 
 /*-----------------------------------------------------------*/
@@ -182,14 +184,9 @@ static TimerHandle_t xLightTimer;
 static TimerHandle_t xSpawnTimer;
 
 static TickType_t initialSpawnDuration;
+static TickType_t initialRedDuration;
 
-lightTimer = xTimerCreate(
-		"LightTimer",
-		pdMS_TO_TICKS(1000),
-		pdTRUE,
-		NULL,
-		Traffic_Light_Task
-);
+
 
 
 /*
@@ -198,15 +195,29 @@ lightTimer = xTimerCreate(
  */
 static void prvSetupHardware( void );
 
+QueueHandle_t xTrafficLoadQueue;
 /*
  * The queue send and receive tasks as described in the comments at the top of
  * this file.
  */
+/*
 static void Manager_Task( void *pvParameters );
 static void Blue_LED_Controller_Task( void *pvParameters );
 static void Green_LED_Controller_Task( void *pvParameters );
 static void Red_LED_Controller_Task( void *pvParameters );
 static void Amber_LED_Controller_Task( void *pvParameters );
+*/
+static void xTraffic_Controller_Task(void *pvParameters);
+static void xTraffic_Load_Task(void);
+static void vSpawn_Callback(TimerHandle_t xSpawnTimer);
+static void vTraffic_Light_Callback(TimerHandle_t xLightTimer, TrafficState state);
+void renderTrafficLight(uint8_t leds[], TrafficState state);
+TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel);
+TrafficState AdvanceTrafficLightState(TrafficState *state);
+void RenderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8]);
+void UpdateRoadAndIntersection(uint8_t inter[3], uint8_t left[8], uint8_t right[8], bool spawnCar, TrafficState state);
+void ShiftLEDArray(uint8_t leds[], int count);
+void RenderIntersection(uint8_t leds[], uint8_t intersection[3]);
 
 
 
@@ -220,13 +231,14 @@ int main(void)
 	can be done here if it was not done before main() was called. */
 	prvSetupHardware();
 
-	MessageBufferHandle_t xTrafficLoadMessageBuffer;
-	xTrafficLoadMessageBuffer = xMessageBufferCreate(BUFFER_SIZE); //Sends Traffic Load from ADC
+
+	xTrafficLoadQueue = xQueueCreate(10, sizeof(uint16_t)); //Sends Traffic Load from ADC
 																   //to Traffic Controller Task
 
 
 	initialSpawnDuration = pdMS_TO_TICKS(800); //Set on RED to start. Just like
 											   //Traffic Controller Task
+	initialRedDuration = pdMS_TO_TICKS(1000);
 
 	xLightTimer = xTimerCreate(
 			"Light Timer",
@@ -245,16 +257,13 @@ int main(void)
 			);
 
 
-	if (xTrafficLoadMessageBuffer != NULL)
-	{
-		xTaskCreate(vTraffic_Load_Task, "TrafficLoad", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
-	}
-	else{
-		printf("Failed to create message buffer.\n");
-	}
 
 
-	xTaskCreate(v=xTraffic_Controller_Task, "Traffic", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
+	xTaskCreate(xTraffic_Load_Task, "TrafficLoad", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+
+
+
+	xTaskCreate(xTraffic_Controller_Task, "Traffic", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
 
 
 	/* Start the tasks and timer running. */
@@ -265,28 +274,12 @@ int main(void)
 	return 0;
 }
 
-static void ADC_Test()
-{
-	ADC_SoftwareStartConv(ADC1);
-	for (int i = 0; i < 1000; i++)
-	{
-		while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC));
-		uint16_t aDC1_Value = ADC_GetConversionValue(ADC1);
-		printf("ADC value: %d\n ", aDC1_Value);
 
-
-	}
-}
-
-static void Traffic_Light_Test()
-{
-	GPIO_SetBits(GPIOC,GPIO_Pin_0);
-}
 
 /*-------------------------------------------------------*/
 
 
-static void vTraffic_Load_Task(void)
+static void xTraffic_Load_Task(void)
 {
 	while(1)
 	{
@@ -294,26 +287,9 @@ static void vTraffic_Load_Task(void)
 		if (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC))
 		{
 			uint16_t trafficLevel = ADC_GetConversionValue(ADC1);
-			size_t messageLength = sizeof(trafficLevel);
-			BaseType_t result;
-			if (xMessageBufferIsEmpty(xTrafficLoadMessageBuffer)){
-				printf("Message Buffer Empty after ADC conversion");
-			}
-			else
-			{
+			xQueueSend(xTrafficLoadQueue, &trafficLevel, 0);
+
 				// Send traffic load to Traffic_Controller_Task for changing the traffic light duration.
-
-
-				result = xMessageBufferSend(xTrafficLoadMessageBuffer, trafficLevel,
-						messageLength, pdMS_TO_TICKS(100));
-				if (result > 0)
-				{
-					printf("Message sent to Traffic_Light_Task");
-				}
-				else
-				{
-					printf("Message not sent to Traffic_Light_Task");
-				}
 
 
 				// Change the period of the Spawn Callback with Traffic Level
@@ -343,7 +319,7 @@ static void vTraffic_Load_Task(void)
 
 
 
-		}
+
 	}
 }
 
@@ -352,63 +328,53 @@ static void vTraffic_Load_Task(void)
 static void xTraffic_Controller_Task(void *pvParameters)
 {
 	(void) pvParameters;
-	uint16_t rxBuffer;			//Buffer for traffic load
-	size_t xReceivedBytes;
 	TrafficState state = RED_STATE;
 	uint8_t leds[22] = {0};
 	uint8_t roadLeft[8] = {0};
 	uint8_t roadRight[8] = {0};
+	uint8_t intersection[3] = {0};
 	bool spawnCar;
-	Message
+	uint16_t trafficLevel;
+
 
 	while(1)
 	{
-		xReceivedBytes = xMessageBufferReceive(
-				xTrafficLoadMessageBuffer,
-				&rxBuffer,
-				sizeof(rxBuffer),
-				pdMS_TO_TICKS(200)
-		);
+		xQueueReceive(xTrafficLoadQueue, trafficLevel, 1000); //MAX DELAY 1000
+ // May need to dereference
 
-		//If Buffer has data in it update state
-		if (xReceivedBytes > 0)
-		{
-			trafficLevel = rxBuffer;
+
 
 			//See if it is time to spawn a car or change the light
 			uint32_t events = 0;
 
 			xTaskNotifyWait(0, UINT32_MAX, &events, 0);
 
-			if (events & EVENT_SPAWN_CAR)
+			if (events && EVENT_SPAWN_CAR)
 			{
 				spawnCar = true;
 			}
-			if (events & EVENT_LIGHT_CHANGE)
+			if (events && EVENT_LIGHT_CHANGE)
 			{
-				TickType_t nextPeriod = GetLightDuration(lightState, trafficLevel);
-				xTimerChangePeriod(xLightTimer, nextPeriod, 0); // Changes the timer for
-				AdvanceTrafficLightState(TrafficState *state); //Traffic Light
+
+				AdvanceTrafficLight(TrafficState *state);
+				TickType_t nextPeriod = GetLightDuration(state, trafficLevel);
+				xTimerChangePeriod(xLightTimer, nextPeriod, 0);
 			}
 
 			//Updates state of the road
 
-			UpdateRoadAndIntersection(intersection, roadLeft, roadRight, spawnCar);
+			UpdateRoadAndIntersection(intersection, roadLeft, roadRight, spawnCar, state);
 
 			//Sets the state of the road to the LED display
 
-			renderRoad(leds, roadLeft, roadRight);
-			renderIntersection(leds, intersection);
-			renderTrafficLight(leds, state);
+			RenderRoad(leds, roadLeft, roadRight);
+			RenderIntersection(leds, intersection);
+			RenderTrafficLight(leds, state);
 
-			ShiftLEDArray(leds); // Need to implement
+			ShiftLEDArray(leds, 22);
 
 
-		}// end of (if received data != NULL)
-		else
-		{
-			printf("No Traffic Load Data Received");
-		}
+
 
 
 	}
@@ -426,7 +392,7 @@ static void vSpawn_Callback(TimerHandle_t xSpawnTimer)
 
 /*-----------------------------------------------------------*/
 
-static void vTraffic_Light_Callback(TimerHandle_t xLightTimer, state)
+static void vTraffic_Light_Callback(TimerHandle_t xLightTimer, TrafficState state)
 {
 	xTaskNotify(xTraffic_Controller_Task, EVENT_LIGHT_CHANGE, eSetBits);
 
@@ -435,7 +401,7 @@ static void vTraffic_Light_Callback(TimerHandle_t xLightTimer, state)
 
 /*-----------------------------------------------------------*/
 
-void renderTrafficLight(uint8_t leds[], TrafficState state)
+void RenderTrafficLight(uint8_t leds[], TrafficState state)
 {
 	leds[10] = (state == RED_STATE);
 	leds[20] = (state == AMBER_STATE);
@@ -450,7 +416,7 @@ void RenderIntersection(uint8_t leds[], uint8_t intersection[3])
 
 }
 
-void renderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8])
+void RenderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8])
 {
 	for (int i = 0; i < 8; i++)
 	{
@@ -464,7 +430,7 @@ void renderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8])
 
 /*-----------------------------------------------------------*/
 
-void UpdateRoadAndIntersection(uint8_t inter[3], uint8_t left[8], uint8_t right[8], bool spawnCar)
+void UpdateRoadAndIntersection(uint8_t inter[3], uint8_t left[8], uint8_t right[8], bool spawnCar, TrafficState state)
 {
 	//Update intersection && Road.
 
@@ -492,7 +458,7 @@ void UpdateRoadAndIntersection(uint8_t inter[3], uint8_t left[8], uint8_t right[
 	inter[0] = 0;
 
 	bool entryAllowed =
-			(lightState == GREEN_STATE) &&
+			(state == GREEN_STATE) &&
 			(inter[0]==0);
 
 
@@ -530,6 +496,8 @@ void UpdateRoadAndIntersection(uint8_t inter[3], uint8_t left[8], uint8_t right[
 
 TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel)
 {
+	TickType_t newPeriod;
+
 	if (lightState == GREEN_STATE)
 	{
 		//Yellow Light next. Constant 500ms
@@ -584,20 +552,23 @@ TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel)
 
 /*-----------------------------------------------------------*/
 
-void AdvanceTrafficLightState(TrafficState *state)
+TrafficState AdvanceTrafficLight(TrafficState *state)
 {
 	switch (*state)
 	{
 	case RED_STATE:
 		*state = GREEN_STATE;
+		return GREEN_STATE;
 		break;
 
 	case GREEN_STATE:
 		*state = AMBER_STATE;
+		return AMBER_STATE;
 		break;
 
 	case AMBER_STATE:
 		*state = RED_STATE;
+		return RED_STATE;
 		break;
 
 	}
@@ -622,7 +593,7 @@ void ShiftLEDArray(uint8_t leds[], int count)
 
 
 /*-----------------------------------------------------------*/
-
+/*
 static void Manager_Task( void *pvParameters )
 {
 	uint16_t tx_data = amber;
@@ -654,7 +625,7 @@ static void Manager_Task( void *pvParameters )
 	}
 }
 
-/*-----------------------------------------------------------*/
+
 
 static void Blue_LED_Controller_Task( void *pvParameters )
 {
@@ -682,7 +653,6 @@ static void Blue_LED_Controller_Task( void *pvParameters )
 }
 
 
-/*-----------------------------------------------------------*/
 
 static void Green_LED_Controller_Task( void *pvParameters )
 {
@@ -709,7 +679,7 @@ static void Green_LED_Controller_Task( void *pvParameters )
 	}
 }
 
-/*-----------------------------------------------------------*/
+
 
 static void Red_LED_Controller_Task( void *pvParameters )
 {
@@ -737,7 +707,7 @@ static void Red_LED_Controller_Task( void *pvParameters )
 }
 
 
-/*-----------------------------------------------------------*/
+
 
 static void Amber_LED_Controller_Task( void *pvParameters )
 {
@@ -764,7 +734,7 @@ static void Amber_LED_Controller_Task( void *pvParameters )
 	}
 }
 
-
+*/
 /*-----------------------------------------------------------*/
 
 void vApplicationMallocFailedHook( void )
