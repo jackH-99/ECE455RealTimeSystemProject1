@@ -110,8 +110,9 @@ void ADC_Initialization()
 	ADC_InitStruct.ADC_ContinuousConvMode = ENABLE;
 
 	ADC_Init(ADC1,&ADC_InitStruct);
-	ADC_RegularChannelConfig(ADC1,ADC_Channel_3, 1, ADC_SampleTime_3Cycles); // try different vals
+	ADC_RegularChannelConfig(ADC1,ADC_Channel_3, 1, ADC_SampleTime_56Cycles); // try different cycles
 	ADC_Cmd(ADC1, ENABLE);
+	ADC_SoftwareStartConv(ADC1);
 }
 
 void shiftBit(uint8_t bit)

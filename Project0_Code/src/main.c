@@ -177,8 +177,8 @@ typedef enum {
 	AMBER_STATE
 } TrafficState;
 
-#define EVENT_SPAWN_CAR (1 << 0)
-#define EVENT_LIGHT_CHANGE (1 << 1)
+#define SPAWN_BIT (1UL << 0)
+#define ADVANCE_LIGHT_BIT (1UL << 1)
 
 static TimerHandle_t xLightTimer;
 static TimerHandle_t xSpawnTimer;
@@ -207,8 +207,8 @@ static void Green_LED_Controller_Task( void *pvParameters );
 static void Red_LED_Controller_Task( void *pvParameters );
 static void Amber_LED_Controller_Task( void *pvParameters );
 */
-static void xTraffic_Controller_Task(void *pvParameters);
-static void xTraffic_Load_Task(void *pvParameters);
+static void Traffic_Load_Task(void *pvParameters);
+static void Traffic_Controller_Task(void *pvParameters);
 static void vSpawn_Callback(TimerHandle_t xSpawnTimer);
 static void vTraffic_Light_Callback(TimerHandle_t xLightTimer);
 TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel);
@@ -219,6 +219,9 @@ void ShiftLEDArray(uint8_t leds[], int count);
 void RenderIntersection(uint8_t leds[], uint8_t intersection[3]);
 void RenderTrafficLight(uint8_t leds[], TrafficState state);
 void ConvertLEDToBytes(uint8_t leds[]);
+
+TaskHandle_t xTraffic_Controller_Task;
+TaskHandle_t xTraffic_Load_Task;
 
 typedef enum {
 	TRAFFIC_LOW = 0,
@@ -239,18 +242,19 @@ int main(void)
 	prvSetupHardware();
 
 
+
 	xTrafficLoadQueue = xQueueCreate(10, sizeof(uint16_t)); //Sends Traffic Load from ADC
 																   //to Traffic Controller Task
 
 
-	initialSpawnDuration = pdMS_TO_TICKS(800); //Set on RED to start. Just like
+	initialSpawnDuration = pdMS_TO_TICKS(500); //Set on RED to start. Just like
 											   //Traffic Controller Task
 	initialRedDuration = pdMS_TO_TICKS(1000);
 
 	xLightTimer = xTimerCreate(
 			"Light Timer",
 			pdMS_TO_TICKS(initialRedDuration),  //Set on Red to start
-			pdFALSE,
+			pdTRUE,
 			NULL,
 			vTraffic_Light_Callback
 			);
@@ -258,7 +262,7 @@ int main(void)
 	xSpawnTimer = xTimerCreate(
 			"Spawn Timer",
 			pdMS_TO_TICKS(initialSpawnDuration),
-			pdFALSE,
+			pdTRUE,
 			NULL,
 			vSpawn_Callback
 			);
@@ -266,11 +270,11 @@ int main(void)
 
 
 
-	xTaskCreate(xTraffic_Load_Task, "TrafficLoad", 512, NULL, 1, NULL);
+	xTaskCreate(Traffic_Load_Task, "TrafficLoad", 512, NULL, 1, &xTraffic_Load_Task);
 
 
 
-	xTaskCreate(xTraffic_Controller_Task, "Traffic", 1024, NULL, 2, NULL);
+	xTaskCreate(Traffic_Controller_Task, "Traffic", 1024, NULL, 2, &xTraffic_Controller_Task);
 
 
 	/* Start the tasks and timer running. */
@@ -286,7 +290,7 @@ int main(void)
 /*-------------------------------------------------------*/
 
 
-static void xTraffic_Load_Task(void *pvParameters)
+static void Traffic_Load_Task(void *pvParameters)
 {
 	static TrafficLevelBand currentBand = -1;
 	while(1)
@@ -337,7 +341,7 @@ static void xTraffic_Load_Task(void *pvParameters)
 
 
 			}
-			vTaskDelay(pdMS_TO_TICKS(100));
+			vTaskDelay(pdMS_TO_TICKS(10));
 
 
 
@@ -347,7 +351,7 @@ static void xTraffic_Load_Task(void *pvParameters)
 
 /*------------------------------------------------------*/
 
-static void xTraffic_Controller_Task(void *pvParameters)
+static void Traffic_Controller_Task(void *pvParameters)
 {
 	(void) pvParameters;
 	TrafficState state = RED_STATE;
@@ -369,15 +373,15 @@ static void xTraffic_Controller_Task(void *pvParameters)
 
 
 			//See if it is time to spawn a car or change the light
-			uint32_t events = 0;
+			uint32_t bits = 0;
 
-			xTaskNotifyWait(0, UINT32_MAX, &events, 0);
+			xTaskNotifyWait(0, 0xFFFFFFFF, &bits, portMAX_DELAY);
 
-			if (events & EVENT_SPAWN_CAR)
+			if (bits & (1 << SPAWN_BIT))
 			{
 				spawnCar = true;
 			}
-			if (events & EVENT_LIGHT_CHANGE)
+			if (bits & (1 << ADVANCE_LIGHT_BIT))
 			{
 
 				AdvanceTrafficLight(&state);
@@ -405,7 +409,7 @@ static void xTraffic_Controller_Task(void *pvParameters)
 
 
 
-			vTaskDelay(pdMS_TO_TICKS(100));
+			vTaskDelay(pdMS_TO_TICKS(50));
 	}
 
 }
@@ -414,16 +418,21 @@ static void xTraffic_Controller_Task(void *pvParameters)
 
 static void vSpawn_Callback(TimerHandle_t xSpawnTimer)
 {
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	xTaskNotify(xTraffic_Controller_Task, EVENT_SPAWN_CAR, eSetBits);
+	xTaskNotifyFromISR(xTraffic_Controller_Task, (1 << SPAWN_BIT), eSetBits, &xHigherPriorityTaskWoken);
 
+	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 /*-----------------------------------------------------------*/
 
 static void vTraffic_Light_Callback(TimerHandle_t xLightTimer)
 {
-	xTaskNotify(xTraffic_Controller_Task, EVENT_LIGHT_CHANGE, eSetBits);
+
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	xTaskNotifyFromISR(xTraffic_Controller_Task, (1 << ADVANCE_LIGHT_BIT), eSetBits, &xHigherPriorityTaskWoken);
+	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 
 }
 
