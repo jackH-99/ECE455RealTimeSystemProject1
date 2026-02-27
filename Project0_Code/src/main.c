@@ -218,6 +218,13 @@ void UpdateRoadAndIntersection(uint8_t inter[3], uint8_t left[8], uint8_t right[
 void ShiftLEDArray(uint8_t leds[], int count);
 void RenderIntersection(uint8_t leds[], uint8_t intersection[3]);
 void RenderTrafficLight(uint8_t leds[], TrafficState state);
+void ConvertLEDToBytes(uint8_t leds[]);
+
+typedef enum {
+	TRAFFIC_LOW = 0,
+	TRAFFIC_MID,
+	TRAFFIC_HIGH
+} TrafficLevelBand;
 
 
 
@@ -259,11 +266,11 @@ int main(void)
 
 
 
-	xTaskCreate(xTraffic_Load_Task, "TrafficLoad", configMINIMAL_STACK_SIZE, NULL, 1, NULL);
+	xTaskCreate(xTraffic_Load_Task, "TrafficLoad", 512, NULL, 1, NULL);
 
 
 
-	xTaskCreate(xTraffic_Controller_Task, "Traffic", configMINIMAL_STACK_SIZE, NULL, 2, NULL);
+	xTaskCreate(xTraffic_Controller_Task, "Traffic", 1024, NULL, 2, NULL);
 
 
 	/* Start the tasks and timer running. */
@@ -281,13 +288,17 @@ int main(void)
 
 static void xTraffic_Load_Task(void *pvParameters)
 {
+	static TrafficLevelBand currentBand = -1;
 	while(1)
 	{
 		TickType_t newPeriod;
+		TrafficLevelBand newBand;
 		if (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC))
 		{
+			printf("Load Task Alive");
 			uint16_t trafficLevel = ADC_GetConversionValue(ADC1);
 			xQueueSend(xTrafficLoadQueue, &trafficLevel, 0);
+
 
 				// Send traffic load to Traffic_Controller_Task for changing the traffic light duration.
 
@@ -297,20 +308,31 @@ static void xTraffic_Load_Task(void *pvParameters)
 				if (trafficLevel < 1365)
 				{
 					newPeriod = pdMS_TO_TICKS(500);
+					newBand = TRAFFIC_LOW;
+
 
 				}
 				else if (trafficLevel < 2730)
 				{
 					newPeriod = pdMS_TO_TICKS(800);
+					newBand = TRAFFIC_MID;
+
 
 				}
 				else
 				{
 					newPeriod = pdMS_TO_TICKS(1500);
+					newBand = TRAFFIC_HIGH;
+
 
 				}
 
-				xTimerChangePeriod(xSpawnTimer, newPeriod, 0);
+				if (newBand != currentBand)
+				{
+					currentBand = newBand;
+					xTimerChangePeriod(xSpawnTimer, newPeriod, 0);
+				}
+
 
 
 
@@ -339,7 +361,9 @@ static void xTraffic_Controller_Task(void *pvParameters)
 
 	while(1)
 	{
-		xQueueReceive(xTrafficLoadQueue, &trafficLevel, 1000); //MAX DELAY 1000
+		if (xQueueReceive(xTrafficLoadQueue, &trafficLevel, pdMS_TO_TICKS(1000)) == pdTRUE){
+			printf("Received: %u\n", trafficLevel);//MAX DELAY 1000
+		}
  // May need to dereference
 
 
@@ -381,9 +405,9 @@ static void xTraffic_Controller_Task(void *pvParameters)
 
 
 
-
+			vTaskDelay(pdMS_TO_TICKS(100));
 	}
-	vTaskDelay(pdMS_TO_TICKS(100));
+
 }
 
 /*-----------------------------------------------------------*/
@@ -444,7 +468,6 @@ void RenderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8])
 	leds[7] = 0;
 
 
-
 	//LED [7] is always 0 because it is the output of the chain.
 
 
@@ -459,6 +482,7 @@ void RenderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8])
 	leds[21] = left[7];
 
 	//moved to next shift register;
+
 
 
 
@@ -844,7 +868,7 @@ static void prvSetupHardware( void )
 {
 	/* Ensure all priority bits are assigned as preemption priority bits.
 	http://www.freertos.org/RTOS-Cortex-M3-M4.html */
-	NVIC_SetPriorityGrouping( 0 );
+	NVIC_SetPriorityGrouping(NVIC_PriorityGroup_4);
 
 	enableClocks();
 	ADC_GPIO_Initialization();

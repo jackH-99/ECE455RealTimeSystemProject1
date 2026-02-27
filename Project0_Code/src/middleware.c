@@ -20,7 +20,7 @@ void enableClocks();
 
 
 void enableClocks(){
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE); // set for the shift registers now
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE); // set for the shift registers now
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE); // don't know if this is right for the ADC
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
