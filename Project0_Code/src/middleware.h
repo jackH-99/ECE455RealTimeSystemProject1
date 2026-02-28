@@ -10,6 +10,8 @@
 
 #include <stdint.h>
 
+#define SR_DATA_PIN GPIO_Pin_6
+
 void shiftByte(uint8_t value);
 void shiftBit(uint8_t bit);
 void clearShiftRegister(void);

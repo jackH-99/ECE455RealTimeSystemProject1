@@ -80,19 +80,19 @@ void ShiftReg_GPIO_Init(void)
 	GPIO_ShiftRegisterReset1.GPIO_Pin = GPIO_Pin_8;
 	GPIO_ShiftRegisterReset1.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_ShiftRegisterReset1.GPIO_OType = GPIO_OType_PP;
-	GPIO_ShiftRegisterReset1.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterReset1.GPIO_Speed = GPIO_Speed_2MHz;
 	GPIO_ShiftRegisterReset1.GPIO_PuPd = GPIO_PuPd_NOPULL;
 
 	GPIO_ShiftRegisterClock1.GPIO_Pin = GPIO_Pin_7;
 	GPIO_ShiftRegisterClock1.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_ShiftRegisterClock1.GPIO_OType = GPIO_OType_PP;
-	GPIO_ShiftRegisterClock1.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterClock1.GPIO_Speed = GPIO_Speed_2MHz;
 	GPIO_ShiftRegisterClock1.GPIO_PuPd = GPIO_PuPd_NOPULL;
 
 	GPIO_ShiftRegisterData1.GPIO_Pin = GPIO_Pin_6;
 	GPIO_ShiftRegisterData1.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_ShiftRegisterData1.GPIO_OType = GPIO_OType_PP;
-	GPIO_ShiftRegisterData1.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_ShiftRegisterData1.GPIO_Speed = GPIO_Speed_2MHz;
 	GPIO_ShiftRegisterData1.GPIO_PuPd = GPIO_PuPd_NOPULL;
 
 

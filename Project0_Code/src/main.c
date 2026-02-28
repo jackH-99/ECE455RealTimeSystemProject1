@@ -219,6 +219,7 @@ void ShiftLEDArray(uint8_t leds[], int count);
 void RenderIntersection(uint8_t leds[], uint8_t intersection[3]);
 void RenderTrafficLight(uint8_t leds[], TrafficState state);
 void ConvertLEDToBytes(uint8_t leds[]);
+static void Wiring_Task(void *pvParameters);
 
 TaskHandle_t xTraffic_Controller_Task;
 TaskHandle_t xTraffic_Load_Task;
@@ -237,9 +238,14 @@ int main(void)
 {
 
 
-	/* Configure the system ready to run the demo.  The clock configuration
-	can be done here if it was not done before main() was called. */
+	// Configure the system ready to run the demo.  The clock configuration
+	//can be done here if it was not done before main() was called.
 	prvSetupHardware();
+
+	//TaskHandle_t xWiring_Task;
+
+	//xTaskCreate(Wiring_Task, "Wiring", 512, NULL, 3, &xWiring_Task);
+	//vTaskStartScheduler();
 
 
 
@@ -247,9 +253,9 @@ int main(void)
 																   //to Traffic Controller Task
 
 
-	initialSpawnDuration = pdMS_TO_TICKS(500); //Set on RED to start. Just like
+	initialSpawnDuration = pdMS_TO_TICKS(2000); //Set on RED to start. Just like
 											   //Traffic Controller Task
-	initialRedDuration = pdMS_TO_TICKS(1000);
+	initialRedDuration = pdMS_TO_TICKS(2000);
 
 	xLightTimer = xTimerCreate(
 			"Light Timer",
@@ -270,17 +276,24 @@ int main(void)
 
 
 
-	xTaskCreate(Traffic_Load_Task, "TrafficLoad", 512, NULL, 1, &xTraffic_Load_Task);
+	xTaskCreate(Traffic_Load_Task, "TrafficLoad", 512, NULL, 2, &xTraffic_Load_Task);
 
 
 
 	xTaskCreate(Traffic_Controller_Task, "Traffic", 1024, NULL, 2, &xTraffic_Controller_Task);
 
+	uint8_t leds[22] = {0};
 
-	/* Start the tasks and timer running. */
+	for (int i = 0; i < 22; i++)
+	{
+		leds[i] = 0;
+	}
+	ConvertLEDToBytes(leds);
+	// Start the tasks and timer running.
 	xTimerStart(xLightTimer,0);
 	xTimerStart(xSpawnTimer, 0);
 	vTaskStartScheduler();
+
 
 	return 0;
 }
@@ -288,6 +301,47 @@ int main(void)
 
 
 /*-------------------------------------------------------*/
+
+static void Wiring_Task(void *pvParameters)
+{
+	uint8_t leds[23] = {0};
+const uint8_t leftLEDMap[8] = {19, 20, 21, 22, 18, 17, 16, 15};
+const uint8_t rightLEDMap[8] = {3, 2, 1, 0, 5, 4, 6, 11};
+const uint8_t interLEDMap[3] = {12, 13, 14};
+while(1){
+
+
+for (int i = 0; i < 8; i++)
+{
+	for (int j = 0; j < 23; j++) leds[j]=0;
+	leds[leftLEDMap[i]] = 1;
+
+	ConvertLEDToBytes(leds);
+	vTaskDelay(500);
+
+
+}
+
+
+for (int i = 0; i < 3; i++)
+{
+	for (int j = 0; j< 23; j++) leds[j] = 0;
+	leds[interLEDMap[i]] = 1;
+	ConvertLEDToBytes(leds);
+	vTaskDelay(500);
+}
+for (int i = 0; i < 8; i++)
+{
+	for (int j = 0; j < 23; j++) leds[j]=0;
+	leds[rightLEDMap[i]] = 1;
+
+	ConvertLEDToBytes(leds);
+	vTaskDelay(500);
+
+
+}
+}
+}
 
 
 static void Traffic_Load_Task(void *pvParameters)
@@ -311,21 +365,21 @@ static void Traffic_Load_Task(void *pvParameters)
 
 				if (trafficLevel < 1365)
 				{
-					newPeriod = pdMS_TO_TICKS(500);
+					newPeriod = pdMS_TO_TICKS(4000);
 					newBand = TRAFFIC_LOW;
 
 
 				}
 				else if (trafficLevel < 2730)
 				{
-					newPeriod = pdMS_TO_TICKS(800);
+					newPeriod = pdMS_TO_TICKS(3500);
 					newBand = TRAFFIC_MID;
 
 
 				}
 				else
 				{
-					newPeriod = pdMS_TO_TICKS(1500);
+					newPeriod = pdMS_TO_TICKS(3000);
 					newBand = TRAFFIC_HIGH;
 
 
@@ -341,7 +395,7 @@ static void Traffic_Load_Task(void *pvParameters)
 
 
 			}
-			vTaskDelay(pdMS_TO_TICKS(10));
+			vTaskDelay(pdMS_TO_TICKS(2000));
 
 
 
@@ -355,7 +409,7 @@ static void Traffic_Controller_Task(void *pvParameters)
 {
 	(void) pvParameters;
 	TrafficState state = RED_STATE;
-	uint8_t leds[22] = {0};
+	uint8_t leds[23] = {0};
 	uint8_t roadLeft[8] = {0};
 	uint8_t roadRight[8] = {0};
 	uint8_t intersection[3] = {0};
@@ -374,8 +428,9 @@ static void Traffic_Controller_Task(void *pvParameters)
 
 			//See if it is time to spawn a car or change the light
 			uint32_t bits = 0;
+			const uint32_t bitsToClearOnEntry = (1 << SPAWN_BIT) | (1 << ADVANCE_LIGHT_BIT);
 
-			xTaskNotifyWait(0, 0xFFFFFFFF, &bits, portMAX_DELAY);
+			xTaskNotifyWait(bitsToClearOnEntry, 0xFFFFFFFF, &bits, portMAX_DELAY);
 
 			if (bits & (1 << SPAWN_BIT))
 			{
@@ -409,7 +464,7 @@ static void Traffic_Controller_Task(void *pvParameters)
 
 
 
-			vTaskDelay(pdMS_TO_TICKS(50));
+			vTaskDelay(pdMS_TO_TICKS(2000));
 	}
 
 }
@@ -450,9 +505,9 @@ void RenderTrafficLight(uint8_t leds[], TrafficState state)
 
 void RenderIntersection(uint8_t leds[], uint8_t intersection[3])
 {
-	leds[11] = intersection[0];
-	leds[12] = intersection[1];
-	leds[13] = intersection[2];
+	leds[12] = intersection[0];
+	leds[14] = intersection[2];
+	leds[13] = intersection[1];
 
 	//correct led numbers
 
@@ -460,37 +515,48 @@ void RenderIntersection(uint8_t leds[], uint8_t intersection[3])
 
 void RenderRoad(uint8_t leds[], uint8_t left[8], uint8_t right[8])
 {
+	const uint8_t leftLEDMap[8] = {19, 20, 21, 22, 18, 17, 16, 15};
+	const uint8_t rightLEDMap[8] = {3, 2, 1, 0, 5, 4, 6, 11};
+	const uint8_t interLEDMap[3] = {12, 13, 14};
 
 	leds[3] = right[0];
 	leds[2] = right[1];
 	leds[1] = right[2];
 	leds[0] = right[3];
 
-	leds[4] = right[6];
-	leds[5] = right[5];
-	leds[6] = right[4];
+	leds[5] = right[4];
+	leds[4] = right[5];
+	leds[6] = right[6];
 
 	//correct for right side of road
 
-	//led [7] is q0 on second shift register.
+	//led [7] is qH on second shift register.
 
 	leds[7] = 0;
 
 
 	//LED [7] is always 0 because it is the output of the chain.
 
+	// LED[15] is also always 0 because I don't have qH on shift register 2 connected to an LED
 
-	leds[14] = left[3];
-	leds[15] = left[2];
-	leds[16] = left[1];
-	leds[17] = left[0];
 
-	leds[18] = left[5];
-	leds[19] = left[4];
-	leds[20] = left[6];
-	leds[21] = left[7];
 
-	//moved to next shift register;
+	leds[11] = right[7];
+	//Because of a mixup ^
+
+	leds[18] = left[4];
+	leds[17] = left[5];
+	leds[16] = left[6];
+	leds[15] = left[7];
+
+	leds[19] = left[0];
+	leds[20] = left[1];
+	leds[21] = left[2];
+	leds[22] = left[3];
+
+	//leds 15 is left 3 now because I don't have a 24 uint array
+
+	//New sinking wiring
 
 
 
@@ -516,7 +582,7 @@ void ConvertLEDToBytes(uint8_t leds[])
 		sr2 |= (leds[7+i] & 1) << i;
 
 	}
-	for (int i = 0; i < 7; i++)
+	for (int i = 0; i < 8; i++)
 	{
 
 		sr3 |= (leds[15+i] & 1) << i;
@@ -526,7 +592,7 @@ void ConvertLEDToBytes(uint8_t leds[])
 
 
 	//MSB first
-	shiftByte(sr3);
+	shiftByte(~sr3);
 	shiftByte(sr2);
 	shiftByte(sr1);
 }
@@ -539,55 +605,54 @@ void UpdateRoadAndIntersection(uint8_t inter[3], uint8_t left[8], uint8_t right[
 
 	//Doesn't do anything to the lights.
 	//The lights are rendered from the traffic light state in the Traffic Controller Task
-
+	bool newRightCar = inter[2] == 1;
 	//update right side of road first
 	right[7] = 0;
 	for (int i = 7; i > 0; i--)
 	{
-		right[i] = right[i-1];
+
+			right[i] = right[i-1];
+
 
 	}
-	right[0] = 0;
+
 
 	//update intersection and determine if entry is allowed
 	//in the intersection
 
-	if (inter[2] == 1)
-	{
-		right[0] = 1;
-	}
+
+	right[0] = newRightCar;
 	inter[2] = inter[1];
 	inter[1] = inter[0];
 	inter[0] = 0;
 
 	bool entryAllowed =
-			(state == GREEN_STATE) &&
-			(inter[0]==0);
+			(state == GREEN_STATE);
 
 
 	// Move into the intersection and update left side of road.
-	if (entryAllowed && left[7] == 1)
+	for (int i = 7;  i >= 0; i--)
 	{
-		inter[0] = 1;
-		left[7] = 0;
-	}
-	else if (!entryAllowed && left[7] == 1)
-	{
-		//left[7] stays where it is.
-	}
-	else
-	{
-		//Left[7] == 0. Left side can go on normally
-	}
-
-	for (int i = 7; i > 0; i--)
-	{
-		if (left[i] == 0)	//Only update the left side of the road spaces if there is no car in front
+		if (i == 7)
 		{
-			left[i] = left[i-1];
+			//check intersection
+			if (left[7] == 1 && entryAllowed && inter[0] == 0)
+			{
+				inter[0] = 1;
+				left[7] = 0;
+			}
+			//else left[7] stays blocked
+		}
+		else
+		{
+			if (left[i] == 1 && left[i+1] == 0)
+			{
+				left[i+1] = 1;
+				left[i] = 0;
+			}
 		}
 	}
-	if (spawnCar == true && left[0]!=1)
+	if (spawnCar == true && left[0]==0)
 	{
 		left[0] = 1;
 	}
@@ -604,7 +669,7 @@ TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel)
 	if (lightState == GREEN_STATE)
 	{
 		//Yellow Light next. Constant 500ms
-		newPeriod = pdMS_TO_TICKS(500);
+		newPeriod = pdMS_TO_TICKS(800);
 	}
 	else if (lightState == AMBER_STATE) // red light next
 	{
@@ -612,7 +677,7 @@ TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel)
 		if (trafficLevel < 1365)
 			{
 				//High Traffic. red gets shorter
-				newPeriod = pdMS_TO_TICKS(1000);
+				newPeriod = pdMS_TO_TICKS(1500);
 
 			}
 			else if (trafficLevel < 2730)
@@ -624,7 +689,7 @@ TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel)
 			else
 			{
 				// middle red is kinda short
-				newPeriod = pdMS_TO_TICKS(1500);
+				newPeriod = pdMS_TO_TICKS(2000);
 
 			}
 	}
@@ -633,19 +698,19 @@ TickType_t GetLightDuration(TrafficState lightState, uint16_t trafficLevel)
 		if (trafficLevel < 1365)
 			{
 				//High Traffic. Green gets longer
-				newPeriod = pdMS_TO_TICKS(3000);
+				newPeriod = pdMS_TO_TICKS(4000);
 
 			}
 			else if (trafficLevel < 2730)
 			{
 				// Low Traffic. Green is short
-				newPeriod = pdMS_TO_TICKS(1500);
+				newPeriod = pdMS_TO_TICKS(2000);
 
 			}
 			else
 			{
 				// middle green is still short
-				newPeriod = pdMS_TO_TICKS(1500);
+				newPeriod = pdMS_TO_TICKS(2000);
 
 			}
 
@@ -883,7 +948,7 @@ static void prvSetupHardware( void )
 	ADC_GPIO_Initialization();
 	ShiftReg_GPIO_Init();
 	ADC_Initialization();
-
+	GPIO_ResetBits(GPIOC, GPIO_Pin_6);
 	/* TODO: Setup the clocks, etc. here, if they were not configured before
 	main() was called. */
 }
